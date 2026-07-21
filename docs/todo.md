@@ -1,94 +1,74 @@
 # AskDocs — Task Tracker
 
-The single task tracker for this project. Tick a task (`[ ]` → `[x]`) only
-when it is implemented **and verified**. Checkboxes only — no dates, no
-status notes. Newly discovered work is added as an unchecked task in the
-right phase.
+Single task tracker. Tick a task (`[ ]` → `[x]`) only when implemented **and
+verified**. Checkboxes only — no dates or notes.
 
 ---
 
-## Phase 0 — Project Setup
+## Phase 0 — Setup & Structure
 
-- [x] Scaffold Next.js (App Router) + TypeScript + Tailwind project
-- [x] Write project documentation (`docs/requirements.md`, `docs/architecture.md`, `docs/todo.md`, `README.md`, `CLAUDE.md`)
-- [x] Install runtime dependencies (`@google/genai`, `better-sqlite3`, `drizzle-orm`, `@xenova/transformers`, `unpdf`, `mammoth`, `zod`)
-- [x] Install dev dependencies (`drizzle-kit`, `vitest`, `@types/better-sqlite3`, `tsx`)
-- [x] Add scripts to `package.json` (`typecheck`, `test`, `db:generate`, `db:migrate`, `db:seed`)
-- [x] Create `.env.example` documenting all environment variables
-- [x] Fix `.gitignore`: un-ignore `.env.example`, ignore `*.db-wal` / `*.db-shm`, keep `data/askdocs.db` committed
-- [x] Implement `lib/config.ts` (zod-validated env, all constants incl. `NO_CONTEXT_MESSAGE`, `PROMPT_VERSION`)
+- [x] Monorepo: `web/` (Next.js) + `backend/` (FastAPI) + `docker-compose.yml`
+- [x] Backend deps via `uv` (`pyproject.toml`, `uv.lock`)
+- [x] Frontend deps via `npm`
+- [x] Root task runner (`npm run dev` / `setup` / `qdrant`) with `concurrently`
+- [x] `.env.example`, `.gitignore` (ignore `node_modules`, `.venv`, `data/`, `.env`)
+- [x] `backend/app/config.py` (pydantic-settings; single env reader)
 
-## Phase 1 — Database
+## Phase 1 — Vector Store & Data
 
-- [x] Define Drizzle schema (`users`, `documents`, `chunks`, `answer_cache`, `embedding_cache`, `rate_limit_events`)
-- [x] Implement `lib/db/client.ts` (better-sqlite3 connection, WAL mode)
-- [x] Generate initial migration and apply it
-- [x] Implement seed script for the developer user
-- [x] Implement repositories (`users`, `documents`, `chunks`)
-- [x] Commit pre-migrated, seeded `data/askdocs.db`
+- [x] Qdrant via docker-compose (cosine, 768-dim)
+- [x] `services/vectorstore.py` (ensure collection, upsert, search, delete)
+- [x] SQLite `store.py` (documents metadata + answer cache)
 
-## Phase 2 — Auth (developer mode)
+## Phase 2 — RAG Pipeline (backend services)
 
-- [x] Implement `lib/auth/session.ts` (`getCurrentUser`, `requireUser`, developer-mode resolution)
-- [x] Implement `proxy.ts` guarding `/api/*` (except `/api/health`)
-- [x] Leave the `AUTH_MODE=full` seam documented and type-safe (throws "not implemented")
+- [x] `extraction.py` (pypdf + python-docx, normalization, `ExtractionError`)
+- [x] `chunking.py` (overlapping chunks, boundary snapping, pure)
+- [x] `embedding.py` (Gemini `gemini-embedding-001`, RETRIEVAL_DOCUMENT/QUERY)
+- [x] `retrieval.py` (Qdrant search + relevance gate, pure `apply_gate`)
+- [x] `grounding.py` (system prompt, `NO_CONTEXT_MESSAGE`, user-message builder)
+- [x] `generation.py` (Gemini `gemini-2.5-flash` streaming, temp 0, no thinking)
+- [x] `services/documents.py` (upload orchestration, background processing)
 
-## Phase 3 — RAG Pipeline
+## Phase 3 — API
 
-- [x] Implement `lib/rag/extraction.ts` (PDF via unpdf, DOCX via mammoth, normalization, `ExtractionError`)
-- [x] Implement `lib/rag/chunking.ts` (overlapping chunks, boundary snapping, pure function)
-- [x] Implement `lib/rag/embedding.ts` (MiniLM singleton pipeline, mean pooling, L2 normalization)
-- [x] Implement `lib/cache/embedding-cache.ts` and wire it into embedding
-- [x] Implement `lib/rag/retrieval.ts` (cosine scoring, TOP_K, similarity-threshold relevance gate)
-- [x] Implement `lib/rag/prompt.ts` (grounding system prompt, context-wrapped user message, `PROMPT_VERSION`)
-- [x] Implement `lib/rag/generation.ts` (Gemini SDK wrapper, streaming, temperature 0, thinking disabled)
+- [x] `POST /documents` (validate → insert processing → background embed)
+- [x] `GET /documents` (list with status)
+- [x] `DELETE /documents/{id}` (SQLite row + Qdrant points)
+- [x] `POST /ask` (validate, answer cache, retrieval gate, streamed generation)
+- [x] `GET /health` (liveness)
+- [x] Developer-mode user (`deps.py`); answer cache wired into `/ask`
+- [x] CORS for the web origin; `X-AskDocs-Source` header
 
-## Phase 4 — API Routes
+## Phase 4 — Frontend
 
-- [x] `POST /api/documents` (upload → validate → extract → chunk → embed → persist, status lifecycle)
-- [x] `GET /api/documents` (list with status)
-- [x] `DELETE /api/documents/[id]` (transactional delete of document + chunks)
-- [x] `POST /api/ask` (guards, answer cache, retrieval gate, streamed generation, cache write-back)
-- [x] `GET /api/health` (liveness, unauthenticated)
-- [x] Implement `lib/ratelimit/limiter.ts` and apply to `/api/ask` and `/api/documents` (429 + `Retry-After`)
-- [x] Implement `lib/cache/answer-cache.ts` and wire into `/api/ask`
-- [x] Domain-error → HTTP mapping in the route layer
-- [x] `export const runtime = 'nodejs'` on every DB/SDK/embedding route
+- [x] Repoint to FastAPI (`API_BASE_URL`) with streaming answer rendering
+- [x] Upload dropzone (click + drag-and-drop) with type/size feedback
+- [x] Document list with status badge (`processing`/`ready`/`failed`) + delete
+- [x] Live processing status via polling while any document is `processing`
+- [x] Distinct styling for the out-of-context fallback
+- [x] Empty states and error toasts
 
-## Phase 5 — UI
+## Phase 5 — Tests
 
-- [x] Page layout: document panel + chat panel (responsive, Tailwind)
-- [x] Upload dropzone (click + drag-and-drop) with type/size validation feedback
-- [x] Document list with name, size, status badge (`processing` / `ready` / `failed`), delete action
-- [x] Chat message list with user/assistant bubbles
-- [x] Streaming answer rendering with typing indicator
-- [x] Composer (textarea, Enter to send, disabled while streaming or with no ready documents)
-- [x] Empty states (no documents, no messages) and error toasts
-- [x] Distinct styling for the out-of-context fallback response
+- [x] pytest infra (in-memory store, mocked Gemini/Qdrant)
+- [x] Chunking tests
+- [x] Retrieval gate tests
+- [x] Extraction tests (docx + normalization + failure)
+- [x] Answer-cache key tests
+- [x] API route tests (upload, list, delete, ask fallback/generated/cache, health)
 
-## Phase 6 — Testing
+## Phase 6 — Delivery
 
-- [x] Test infrastructure: temp-file SQLite per test, mocked Gemini client, mocked embedding model
-- [x] Extraction tests (mocked unpdf/mammoth, normalization, empty → `ExtractionError`)
-- [x] Chunking tests (size, overlap, boundary snapping, short-text edge cases)
-- [x] Embedding cache tests (cache hit/miss, persistence)
-- [x] Retrieval tests (ranking, TOP_K, gate fires below threshold)
-- [x] Prompt-construction tests (grounding rules present, chunks labeled, fallback instruction)
-- [x] Answer-cache tests (hit, miss, key changes on corpus/model/prompt-version change)
-- [x] Rate-limiter tests (window sliding, 429 boundary, per-subject isolation)
-- [x] Out-of-context fallback path test (gate → exact `NO_CONTEXT_MESSAGE`, LLM not called)
-- [x] API route tests end-to-end with services stubbed (upload, list, delete, ask, health, 429s)
+- [x] Dockerfiles (backend uv, web) + full docker-compose (qdrant + backend + web)
+- [x] `backend` pytest green; `web` typecheck/lint/build green
+- [x] Live end-to-end verified (grounded answer + exact fallback + cache) against Gemini + Qdrant
+- [ ] Walk the acceptance checklist in the browser
+- [ ] Deploy to a host (or document the `docker compose up` run for reviewers)
 
-## Phase 7 — Polish & Delivery
+## Backlog (not required)
 
-- [x] `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` all pass clean
-- [x] Verify grounded answer + exact fallback against the live Gemini API
-- [ ] Walk the full acceptance checklist in `docs/requirements.md` in the browser
-- [ ] Deploy (or document exact local run steps for reviewers)
-
-## Backlog (not required for the assessment)
-
-- [ ] Chat-history persistence (`messages` table + reload)
-- [ ] `AUTH_MODE=full` with Auth.js
-- [ ] `sqlite-vec` retrieval at scale
+- [ ] Real multi-user auth
+- [ ] Rate limiting
+- [ ] Chat-history persistence
 - [ ] OCR for scanned PDFs

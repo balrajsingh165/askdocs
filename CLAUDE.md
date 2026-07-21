@@ -1,190 +1,111 @@
-@AGENTS.md
-
 # CLAUDE.md
 
 Guidance for Claude Code when working in this repository.
 
 ## Project
 
-AskDocs is a Retrieval-Augmented Generation (RAG) web application built with
-**Next.js**. Users upload PDF or DOCX documents and ask natural-language
-questions answered strictly from the uploaded content. If the answer is not
-present in the documents, the app refuses with a fixed fallback message
-instead of guessing.
+AskDocs is a Retrieval-Augmented Generation (RAG) chatbot. Users upload PDF or
+DOCX documents and ask natural-language questions answered strictly from the
+uploaded content. If the answer is not present, the app refuses with a fixed
+fallback message instead of guessing.
 
-Full specification: [docs/requirements.md](docs/requirements.md)
-System design: [docs/architecture.md](docs/architecture.md)
-Task tracker: [docs/todo.md](docs/todo.md)
+Spec: [docs/requirements.md](docs/requirements.md) ·
+Design: [docs/architecture.md](docs/architecture.md) ·
+Tasks: [docs/todo.md](docs/todo.md)
 
-## Stack
+## Architecture
 
-- **Next.js (App Router) + TypeScript + React**
-- **Tailwind CSS** for styling
-- **SQLite** via `better-sqlite3` + **Drizzle ORM** — the database file
-  (`data/askdocs.db`) is committed to git so reviewers see identical state
-- **Transformers.js** (`Xenova/all-MiniLM-L6-v2`) for local embeddings — no
-  second API key, runs in-process
-- **Google Gemini** (`gemini-2.5-flash`) via `@google/genai` for generation
-- **pdf extraction** via `unpdf`, **docx extraction** via `mammoth`
-- **Vitest** for tests
-- **pnpm** is the package manager (lockfile committed) — never use npm/yarn
+Three services in a monorepo:
+
+- **`web/`** — Next.js (App Router) + React + Tailwind frontend. Chat UI,
+  upload, streaming answers. Talks to the backend over HTTP; see
+  `web/AGENTS.md` for the Next.js 16 caveats.
+- **`backend/`** — Python FastAPI. The entire RAG pipeline. Managed with `uv`.
+- **Qdrant** — vector database (Docker), cosine, 768-dim.
+- **Gemini** — `gemini-embedding-001` (embeddings) + `gemini-2.5-flash`
+  (generation), via `google-genai`.
 
 ## Commands
 
-| Task                  | Command                     |
-| --------------------- | --------------------------- |
-| Install dependencies  | `pnpm install`              |
-| Run dev server        | `pnpm dev`                  |
-| Production build      | `pnpm build`                |
-| Start production      | `pnpm start`                |
-| Lint                  | `pnpm lint`                 |
-| Typecheck             | `pnpm typecheck`            |
-| Run tests             | `pnpm test`                 |
-| Generate DB schema    | `pnpm db:generate`          |
-| Apply migrations      | `pnpm db:migrate`           |
-| Seed developer user   | `pnpm db:seed`              |
+Run from the repo root unless noted.
+
+| Task | Command |
+| ---- | ------- |
+| Install everything | `npm install && npm run setup` |
+| Start Qdrant | `npm run qdrant` (or `docker compose up -d qdrant`) |
+| Dev (both servers) | `npm run dev` (backend :8000, web :3000) |
+| Backend only | `cd backend && uv run uvicorn app.main:app --reload --port 8000` |
+| Frontend only | `cd web && npm run dev` |
+| Backend tests | `cd backend && uv run pytest` (or `npm run test:api`) |
+| Frontend checks | `cd web && npm run typecheck && npm run lint && npm run build` |
+| Full stack (Docker) | `docker compose up --build` |
 
 ## Environment
 
-- Secrets live in `.env.local` or `.env` (never committed). See `.env.example`.
-- Required: `GEMINI_API_KEY` (a Google AI Studio key; `GOOGLE_API_KEY` is also
-  accepted).
-- Optional (have defaults): `GEMINI_MODEL`, `GEMINI_MAX_TOKENS`, `AUTH_MODE`,
-  `SQLITE_PATH`, `DEVELOPER_NAME`, rate-limit and cache settings.
-- All configuration is read once in `lib/config.ts`. Never call
-  `process.env` anywhere else.
+- Secrets live in `.env` at the repo root (never committed). See `.env.example`.
+- Required: `GEMINI_API_KEY` (`GOOGLE_API_KEY` also accepted).
+- The backend reads `backend/.env` then the repo-root `.env`; docker-compose
+  injects the root `.env` into the backend container.
+- All config is read once in `backend/app/config.py` (pydantic-settings). Never
+  read `os.environ` elsewhere.
 
-## Architecture Overview
+## Backend code style
 
-The UI and API live in one Next.js app. The RAG pipeline is a set of
-framework-agnostic services under `lib/` that the API routes call.
+- `api/` handlers stay thin: validate, delegate to a service, shape the
+  response. Business logic lives in `services/`.
+- Services raise domain errors (`ExtractionError`, `GenerationError`); routes
+  map failures to `HTTPException`.
+- Full type hints on public functions; docstrings on modules and public
+  functions. Keep functions short and pure where possible; isolate I/O.
+- Constants live once (`grounding.py` for `NO_CONTEXT_MESSAGE` / the prompt,
+  `config.py` for settings). Never duplicate a literal.
+- `services/vectorstore.py` is the **only** Qdrant touchpoint;
+  `services/generation.py` and `services/embedding.py` are the **only**
+  Gemini touchpoints.
 
-```
-app/                          Next.js App Router (UI + API)
-├── layout.tsx, page.tsx      Chat + upload single page
-├── api/
-│   ├── documents/route.ts        POST upload, GET list
-│   ├── documents/[id]/route.ts   DELETE
-│   ├── ask/route.ts              POST question (streamed answer)
-│   └── health/route.ts           Liveness probe
-components/                    React UI (chat/, upload/, ui/)
-lib/
-├── config.ts                 Settings + constants (NO_CONTEXT_MESSAGE, model, thresholds)
-├── db/                       Drizzle schema, client, repositories
-├── auth/                     Developer-mode session, extendable to full login
-├── cache/                    Answer cache + embedding cache
-├── ratelimit/                Per-subject limiter
-└── rag/                      extraction, chunking, embedding, retrieval, generation
-data/askdocs.db               Committed SQLite database
-tests/                        Mirrors lib/ and app/api/
-```
+## Frontend code style
 
-Rules:
-
-- `lib/rag/` and `lib/db/` must not import from `next/*` or React — they stay
-  reusable and unit-testable in isolation.
-- API route handlers stay thin: authenticate, rate-limit, validate, delegate
-  to a service, shape the response. No business logic in routes.
-- All API routes that touch the DB, embeddings, or the SDK must run on the
-  Node.js runtime: `export const runtime = 'nodejs'` (not Edge).
-
-## Code Style
-
-- Write reusable, single-responsibility functions and modules. If logic is
-  needed twice, extract it — never copy-paste.
-- **No inline comments.** Code must be self-explanatory through naming and
-  structure. Document behavior with **JSDoc/TSDoc doc comments** on exported
-  functions, types, and modules (summary + `@param` + `@returns` + `@throws`).
-- Full TypeScript types on all exports. No `any`; prefer precise types and
-  discriminated unions. Use `zod` to validate anything crossing the API
-  boundary, and derive types from the schemas.
-- Constants live once in `lib/config.ts` and are imported — never re-declare a
-  literal (fallback message, model name, chunk size, thresholds, limits).
-- Throw domain-specific errors from services; map them to HTTP responses only
-  in the route layer.
-- Keep functions short and pure where possible; isolate I/O at the edges.
-- Prefer server components and server actions/route handlers; keep client
-  components thin and focused on interaction.
+- No inline comments; TSDoc on exported functions. Full TypeScript types; no
+  `any`. Client-safe modules only under `web/lib/shared/`.
+- Server-only concerns do not exist in the frontend anymore — it is a pure
+  client that calls the backend via `web/lib/shared/api.ts`.
 
 ## RAG Grounding Rules (non-negotiable)
 
-- Every answer must be derived only from the uploaded document content passed
-  as retrieval context.
+- Every answer must derive only from the uploaded document content.
 - When no relevant context exists, respond with exactly:
   `I don't have enough context in the uploaded document(s) to answer that question.`
-- That string is the constant `NO_CONTEXT_MESSAGE` in `lib/config.ts`. Never
-  duplicate the literal anywhere else.
-- Enforce grounding twice: a retrieval-side relevance gate (skip the LLM call
-  entirely when nothing clears the similarity threshold) and a prompt-side
-  instruction telling the model to output the fallback message when the
-  context does not contain the answer.
-- The model must never answer from its own general knowledge, even when it
-  knows the answer.
+- That string is `NO_CONTEXT_MESSAGE` in `backend/app/grounding.py`. Never
+  duplicate the literal.
+- Enforce grounding twice: the retrieval relevance gate (skip generation when
+  nothing clears `similarity_threshold`) and the prompt-side instruction.
+- The model must never answer from general knowledge.
 
-## Gemini API Usage
+## Gemini usage
 
-- Use the official `@google/genai` SDK — never raw HTTP.
-- Model: `gemini-2.5-flash` by default, read from `config.geminiModel`
-  (override with `GEMINI_MODEL`).
-- `temperature: 0` for faithful, deterministic grounding; `thinkingConfig:
-  { thinkingBudget: 0 }` to keep short factual answers fast; `maxOutputTokens`
-  from `config.geminiMaxTokens` (~1024).
-- Stream the answer (`ai.models.generateContentStream(...)`) so the UI renders
-  tokens as they arrive, like ChatGPT/Claude.
-- Grounding rules go in `systemInstruction`; retrieved chunks and the user
-  question go in the `contents`.
-- All SDK access is wrapped in `lib/rag/generation.ts` (which exposes
-  `streamAnswer`) so nothing else in the codebase touches the SDK directly.
+- Use `google-genai`. Generation: `client.models.generate_content_stream(...)`
+  with `system_instruction`, `temperature=0`, `thinking_config` budget 0,
+  streamed. Embeddings: `client.models.embed_content(...)` with task types
+  `RETRIEVAL_DOCUMENT` (chunks) and `RETRIEVAL_QUERY` (questions).
+- Model ids come from `config.py` (`gemini_model`, `gemini_embed_model`).
 
-## Auth (developer mode)
+## Qdrant
 
-- `AUTH_MODE=developer` (default) resolves every request to the seeded
-  developer user — no login screen. `AUTH_MODE=full` is the future seam for
-  real login (Auth.js) and is not implemented yet.
-- Session lookup lives behind `lib/auth/session.ts` (`getCurrentUser`,
-  `requireUser`). Nothing else reads the auth mode directly.
-- Every DB row is scoped by `userId`, so enabling multi-user later requires no
-  schema change.
-- Middleware guards `/api/*` (except `/api/health`).
-
-## Caching & Rate Limiting
-
-- **Answer cache** — keyed by a hash of `(normalized question + sorted active
-  document ids + model + prompt version)`. A hit returns immediately without
-  retrieval or an LLM call. Adding/removing a document changes the key, so
-  answers can never go stale.
-- **Embedding cache** — keyed by a hash of `(chunk text + embedding model)` so
-  identical content is never re-embedded.
-- **Rate limiting** — per-subject (developer user / IP) sliding window on
-  `/api/ask` and `/api/documents`; returns 429 with `Retry-After`.
-- Both are backed by SQLite tables (committed, durable) with an in-memory fast
-  path. Limits and cache toggles come from `lib/config.ts`.
-
-## Database
-
-- `data/askdocs.db` **is committed** — it is the shared source of truth for
-  reviewers. Keep it pre-migrated and seeded.
-- Gitignore the WAL side files (`*.db-wal`, `*.db-shm`) but **not** the `.db`.
-- Schema changes go through Drizzle migrations (`pnpm db:generate` →
-  `pnpm db:migrate`); commit the regenerated `.db` alongside the migration.
+- One collection (`askdocs_chunks`), cosine, `embed_dim` (768). Payload carries
+  `user_id`, `document_id`, `document_name`, `chunk_index`, `content`.
+- Filter by `user_id` on search; delete by `document_id`.
 
 ## Testing
 
-- Vitest, tests mirroring the `lib/` and `app/api/` layout under `tests/`.
-- Mock the Gemini client and the embedding model — tests never hit the
-  network and never download model weights.
-- Use a throwaway in-memory / temp-file SQLite database per test; never touch
-  the committed `data/askdocs.db`.
-- Required coverage: PDF and DOCX extraction, chunking, retrieval + relevance
-  gate, the out-of-context fallback path, cache hit/miss, the rate limiter,
-  prompt construction, and the API routes end to end with services stubbed.
+- pytest under `backend/tests/`, mirroring the app layout.
+- Mock Gemini (embedding/generation) and Qdrant — tests never hit the network
+  and need no running services. Use an in-memory SQLite store per test.
+- Required coverage: chunking, retrieval gate, extraction, answer-cache key,
+  and the API routes end-to-end.
 
 ## Workflow
 
-- [docs/todo.md](docs/todo.md) is the single task tracker. Before starting
-  work, find the relevant task. When a task is implemented **and verified**,
-  tick it (`[ ]` → `[x]`). Never add dates, timestamps, or status notes —
-  checkboxes only.
-- If new work is discovered, add it as a new unchecked task in the right phase.
+- [docs/todo.md](docs/todo.md) is the task tracker. Tick a task only when
+  implemented **and verified**. Checkboxes only — no dates or notes.
 - Keep [README.md](README.md) and [docs/architecture.md](docs/architecture.md)
-  accurate whenever behavior or structure changes.
+  accurate when behavior or structure changes.
