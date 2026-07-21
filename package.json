@@ -1,43 +1,16 @@
 {
   "name": "askdocs",
-  "version": "0.1.0",
   "private": true,
+  "description": "AskDocs — RAG chatbot. Next.js UI + FastAPI backend + Qdrant + Gemini.",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts"
-  },
-  "dependencies": {
-    "@google/genai": "^2.12.0",
-    "@xenova/transformers": "^2.17.2",
-    "better-sqlite3": "^13.0.1",
-    "drizzle-orm": "^0.45.2",
-    "mammoth": "^1.12.0",
-    "next": "16.2.10",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "unpdf": "^1.6.2",
-    "zod": "^4.4.3"
+    "setup": "npm --prefix web install && uv sync --directory backend",
+    "qdrant": "docker compose up -d qdrant",
+    "dev:api": "uv run --directory backend uvicorn app.main:app --reload --port 8000",
+    "dev:web": "npm --prefix web run dev",
+    "dev": "concurrently -k -n api,web -c magenta,cyan \"npm:dev:api\" \"npm:dev:web\"",
+    "test:api": "uv run --directory backend pytest -q"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "drizzle-kit": "^0.31.10",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.10",
-    "tailwindcss": "^4",
-    "tsx": "^4.23.1",
-    "typescript": "^5",
-    "vitest": "^4.1.10"
+    "concurrently": "^9.1.2"
   }
 }
