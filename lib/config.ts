@@ -1,4 +1,7 @@
 import { z } from "zod";
+import type { DocumentKind } from "@/lib/shared/types";
+
+export type { DocumentKind };
 
 /**
  * Centralised application configuration and constants.
@@ -41,9 +44,6 @@ export const CHUNK_SIZE = 1200;
 
 /** Overlap (characters) between consecutive chunks. */
 export const CHUNK_OVERLAP = 200;
-
-/** A supported upload kind. */
-export type DocumentKind = "pdf" | "docx";
 
 /** Accepted upload types, keyed by both MIME type and file extension. */
 export const ACCEPTED_UPLOAD_TYPES: ReadonlyArray<{

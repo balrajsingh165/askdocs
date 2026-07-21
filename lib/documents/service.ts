@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ACCEPTED_UPLOAD_TYPES, config, type DocumentKind } from "@/lib/config";
+import { ACCEPTED_UPLOAD_TYPES, config } from "@/lib/config";
 import type { Db } from "@/lib/db/client";
 import {
   getDocument,
@@ -13,6 +13,7 @@ import { chunkText } from "@/lib/rag/chunking";
 import { embedChunks } from "@/lib/rag/embedding";
 import { extractDocumentText } from "@/lib/rag/extraction";
 import { vectorToBuffer } from "@/lib/rag/vector";
+import type { DocumentDto, DocumentKind } from "@/lib/shared/types";
 
 /**
  * Upload validation, document processing (extract → chunk → embed → persist),
@@ -28,19 +29,6 @@ export interface ValidatedUpload {
   mimeType: string;
   sizeBytes: number;
   data: Buffer;
-}
-
-/** The document shape returned by the API. */
-export interface DocumentDto {
-  id: string;
-  filename: string;
-  kind: DocumentKind;
-  mimeType: string;
-  sizeBytes: number;
-  status: DocumentRow["status"];
-  error: string | null;
-  chunkCount: number;
-  createdAt: number;
 }
 
 function detectKind(filename: string, mimeType: string): DocumentKind | null {

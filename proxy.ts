@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { config as appConfig } from "@/lib/config";
 
 /**
@@ -9,10 +9,9 @@ import { config as appConfig } from "@/lib/config";
  * the seeded user via {@link requireUser}. In `full` mode (not implemented)
  * it fails the request, keeping the enforcement point in place.
  *
- * @param _request - The incoming request.
  * @returns The proxied response.
  */
-export function proxy(_request: NextRequest): NextResponse {
+export function proxy(): NextResponse {
   if (appConfig.authMode === "full") {
     return NextResponse.json(
       {
