@@ -1,36 +1,106 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AskDocs
+
+AskDocs is a Retrieval-Augmented Generation (RAG) web application. Upload PDF
+or DOCX documents and ask natural-language questions — every answer is
+derived **strictly from the uploaded content**. If the answer isn't in your
+documents, AskDocs says so instead of guessing:
+
+> I don't have enough context in the uploaded document(s) to answer that question.
+
+## Features
+
+- **PDF & DOCX upload** — file picker or drag-and-drop, multiple documents,
+  live processing status, delete/replace at any time.
+- **Grounded question answering** — answers come only from your documents;
+  when multiple documents are relevant, context from all of them is used.
+- **Streaming responses** — answers render token-by-token, like ChatGPT/Claude.
+- **Double grounding enforcement** — a retrieval-side relevance gate (skips
+  the LLM entirely when nothing relevant is found) plus a prompt-side
+  instruction; the model never answers from general knowledge.
+- **Answer & embedding caches** — repeated questions return instantly;
+  identical content is never re-embedded. Cache keys include the active
+  document set, so answers can never go stale.
+- **Rate limiting** — per-user sliding windows on ask and upload endpoints.
+- **Zero-setup reviewing** — the SQLite database (`data/askdocs.db`) is
+  committed pre-migrated and seeded; clone, install, add an API key, run.
+
+## Stack
+
+| Concern | Choice |
+|---------|--------|
+| App | Next.js (App Router) + React + TypeScript + Tailwind CSS |
+| Generation | Claude (`claude-opus-4-8`) via `@anthropic-ai/sdk`, streamed |
+| Embeddings | Transformers.js `Xenova/all-MiniLM-L6-v2` — local, no second API key |
+| Database | SQLite (`better-sqlite3`) + Drizzle ORM |
+| Extraction | `unpdf` (PDF) · `mammoth` (DOCX) |
+| Tests | Vitest |
 
 ## Getting Started
 
-First, run the development server:
+Prerequisites: Node.js 20+, pnpm, an Anthropic API key.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env.local     # then set ANTHROPIC_API_KEY
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000, upload a document, and ask away. No database
+setup is needed — the committed `data/askdocs.db` is already migrated and
+seeded with the developer user.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `ANTHROPIC_API_KEY` | ✅ | — | Claude API access |
+| `AUTH_MODE` | | `developer` | `developer` (no login) or `full` (future) |
+| `SQLITE_PATH` | | `data/askdocs.db` | Database file |
+| `DEVELOPER_NAME` | | `Developer` | Display name for the seeded user |
 
-## Learn More
+Rate-limit and cache settings also have overridable defaults — see
+`lib/config.ts` for the full validated list. Secrets live in `.env.local`,
+which is never committed.
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Task | Command |
+|------|---------|
+| Dev server | `pnpm dev` |
+| Production build / start | `pnpm build` · `pnpm start` |
+| Lint / typecheck | `pnpm lint` · `pnpm typecheck` |
+| Tests | `pnpm test` |
+| DB migrations | `pnpm db:generate` · `pnpm db:migrate` |
+| Seed developer user | `pnpm db:seed` |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## How It Works
 
-## Deploy on Vercel
+1. **Upload** — text is extracted server-side (`unpdf`/`mammoth`), split into
+   overlapping chunks, embedded locally with MiniLM, and stored in SQLite.
+2. **Ask** — the question is embedded and scored (cosine similarity) against
+   all chunks. If nothing clears the relevance threshold, the fixed fallback
+   message is returned **without calling the LLM**.
+3. **Answer** — the top chunks and the question go to Claude with a system
+   prompt that forbids outside knowledge and mandates the exact fallback when
+   the context is insufficient. The answer streams to the UI and is cached.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Full design: [docs/architecture.md](docs/architecture.md) ·
+Specification: [docs/requirements.md](docs/requirements.md) ·
+Task tracker: [docs/todo.md](docs/todo.md)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Auth Model
+
+The app runs in **developer mode**: every request resolves to a single seeded
+developer user, so reviewers need no login. All data is already scoped by
+`userId` and API routes are middleware-guarded, so switching on real
+multi-user login (`AUTH_MODE=full`, Auth.js) later requires no schema change.
+
+## Testing
+
+```bash
+pnpm test
+```
+
+Tests mock the Anthropic client and the embedding model (no network, no model
+downloads) and use a throwaway SQLite database per test — the committed
+`data/askdocs.db` is never touched.
