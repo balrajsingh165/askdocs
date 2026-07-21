@@ -1,7 +1,4 @@
-import {
-  pipeline,
-  type FeatureExtractionPipeline,
-} from "@xenova/transformers";
+import type { FeatureExtractionPipeline } from "@xenova/transformers";
 import { config, EMBEDDING_MODEL } from "@/lib/config";
 import {
   getCachedEmbedding,
@@ -19,9 +16,17 @@ import type { Db } from "@/lib/db/client";
 
 let extractorPromise: Promise<FeatureExtractionPipeline> | null = null;
 
+/**
+ * Load the embedding pipeline lazily via dynamic import. The dynamic import
+ * keeps the heavy `@xenova/transformers` module (and its `sharp` dependency)
+ * out of the build-time module graph — it is only evaluated when an embedding
+ * is first requested at runtime.
+ */
 function getExtractor(): Promise<FeatureExtractionPipeline> {
   if (!extractorPromise) {
-    extractorPromise = pipeline("feature-extraction", EMBEDDING_MODEL);
+    extractorPromise = import("@xenova/transformers").then((module) =>
+      module.pipeline("feature-extraction", EMBEDDING_MODEL),
+    );
   }
   return extractorPromise;
 }
