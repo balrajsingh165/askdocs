@@ -3,11 +3,11 @@
   "private": true,
   "description": "AskDocs — RAG chatbot. Next.js UI + FastAPI backend + Qdrant + Gemini.",
   "scripts": {
-    "setup": "npm --prefix web install && uv sync --directory backend",
+    "setup": "pnpm -C web install && uv sync --directory backend",
     "qdrant": "docker compose up -d qdrant",
     "dev:api": "uv run --directory backend uvicorn app.main:app --reload --port 8000",
-    "dev:web": "npm --prefix web run dev",
-    "dev": "concurrently -k -n api,web -c magenta,cyan \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:web": "pnpm -C web dev",
+    "dev": "concurrently -k -n api,web -c magenta,cyan \"pnpm dev:api\" \"pnpm dev:web\"",
     "test:api": "uv run --directory backend pytest -q"
   },
   "devDependencies": {

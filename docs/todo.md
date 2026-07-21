@@ -9,8 +9,8 @@ verified**. Checkboxes only — no dates or notes.
 
 - [x] Monorepo: `web/` (Next.js) + `backend/` (FastAPI) + `docker-compose.yml`
 - [x] Backend deps via `uv` (`pyproject.toml`, `uv.lock`)
-- [x] Frontend deps via `npm`
-- [x] Root task runner (`npm run dev` / `setup` / `qdrant`) with `concurrently`
+- [x] Frontend deps via `pnpm`
+- [x] Root task runner (`pnpm run dev` / `setup` / `qdrant`) with `concurrently`
 - [x] `.env.example`, `.gitignore` (ignore `node_modules`, `.venv`, `data/`, `.env`)
 - [x] `backend/app/config.py` (pydantic-settings; single env reader)
 

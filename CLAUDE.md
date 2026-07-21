@@ -31,13 +31,13 @@ Run from the repo root unless noted.
 
 | Task | Command |
 | ---- | ------- |
-| Install everything | `npm install && npm run setup` |
-| Start Qdrant | `npm run qdrant` (or `docker compose up -d qdrant`) |
-| Dev (both servers) | `npm run dev` (backend :8000, web :3000) |
+| Install everything | `pnpm install && pnpm run setup` |
+| Start Qdrant | `pnpm run qdrant` (or `docker compose up -d qdrant`) |
+| Dev (both servers) | `pnpm run dev` (backend :8000, web :3000) |
 | Backend only | `cd backend && uv run uvicorn app.main:app --reload --port 8000` |
-| Frontend only | `cd web && npm run dev` |
-| Backend tests | `cd backend && uv run pytest` (or `npm run test:api`) |
-| Frontend checks | `cd web && npm run typecheck && npm run lint && npm run build` |
+| Frontend only | `cd web && pnpm dev` |
+| Backend tests | `cd backend && uv run pytest` (or `pnpm run test:api`) |
+| Frontend checks | `cd web && pnpm typecheck && pnpm lint && pnpm build` |
 | Full stack (Docker) | `docker compose up --build` |
 
 ## Environment

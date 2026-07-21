@@ -42,8 +42,8 @@ Tasks: [docs/todo.md](docs/todo.md)
 
 ## Prerequisites
 
-- **Node.js** 20+ and **Python** 3.11+
-- **[uv](https://docs.astral.sh/uv/)** (Python package manager)
+- **Node.js** 20+ and **pnpm** (`corepack enable pnpm`)
+- **Python** 3.11+ and **[uv](https://docs.astral.sh/uv/)**
 - **Docker** (for Qdrant)
 - A **Google Gemini API key** ([get one](https://aistudio.google.com/apikey))
 
@@ -65,10 +65,10 @@ http://localhost:3000.
 ### Option B — local dev with hot reload
 
 ```bash
-npm install          # root task runner (concurrently)
-npm run setup        # installs web deps (npm) + backend deps (uv)
-npm run qdrant       # start Qdrant in Docker
-npm run dev          # starts backend (:8000) and web (:3000) together
+pnpm install         # root task runner (concurrently)
+pnpm run setup       # installs web deps (pnpm) + backend deps (uv)
+pnpm run qdrant      # start Qdrant in Docker
+pnpm run dev         # starts backend (:8000) and web (:3000) together
 ```
 
 Open http://localhost:3000.
@@ -83,7 +83,7 @@ docker compose up -d qdrant
 cd backend && uv run uvicorn app.main:app --reload --port 8000
 
 # Terminal 3 — frontend (Next.js on 3000)
-cd web && npm run dev
+cd web && pnpm dev
 ```
 
 ## Environment
@@ -121,7 +121,7 @@ docker-compose injects it into the backend container.
 ## Testing
 
 ```bash
-cd backend && uv run pytest      # or: npm run test:api  (from repo root)
+cd backend && uv run pytest      # or: pnpm run test:api  (from repo root)
 ```
 
 The suite covers chunking, the retrieval relevance gate, extraction, the
