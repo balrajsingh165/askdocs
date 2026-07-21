@@ -9,7 +9,7 @@ import {
 } from "@/lib/cache/answer-cache";
 import { db } from "@/lib/db/client";
 import { listReadyDocumentIds } from "@/lib/db/repositories/documents";
-import { ConflictError } from "@/lib/errors";
+import { ConflictError, ValidationError } from "@/lib/errors";
 import { errorResponse, parseJsonBody } from "@/lib/http";
 import { streamAnswer } from "@/lib/rag/generation";
 import { retrieveContext } from "@/lib/rag/retrieval";
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { question: rawQuestion } = await parseJsonBody(request, askSchema);
     const question = rawQuestion.trim();
     if (question.length === 0) {
-      throw new ConflictError("Ask a question to get an answer.");
+      throw new ValidationError("Ask a question to get an answer.");
     }
 
     const readyDocumentIds = listReadyDocumentIds(db, user.id);

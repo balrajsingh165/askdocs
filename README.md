@@ -29,7 +29,7 @@ documents, AskDocs says so instead of guessing:
 | Concern | Choice |
 |---------|--------|
 | App | Next.js (App Router) + React + TypeScript + Tailwind CSS |
-| Generation | Claude (`claude-opus-4-8`) via `@anthropic-ai/sdk`, streamed |
+| Generation | Google Gemini (`gemini-2.5-flash`) via `@google/genai`, streamed |
 | Embeddings | Transformers.js `Xenova/all-MiniLM-L6-v2` — local, no second API key |
 | Database | SQLite (`better-sqlite3`) + Drizzle ORM |
 | Extraction | `unpdf` (PDF) · `mammoth` (DOCX) |
@@ -37,11 +37,12 @@ documents, AskDocs says so instead of guessing:
 
 ## Getting Started
 
-Prerequisites: Node.js 20+, pnpm, an Anthropic API key.
+Prerequisites: Node.js 20+, pnpm, a Google Gemini API key
+([get one here](https://aistudio.google.com/apikey)).
 
 ```bash
 pnpm install
-cp .env.example .env.local     # then set ANTHROPIC_API_KEY
+cp .env.example .env.local     # then set GEMINI_API_KEY
 pnpm dev
 ```
 
@@ -53,7 +54,8 @@ seeded with the developer user.
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `ANTHROPIC_API_KEY` | ✅ | — | Claude API access |
+| `GEMINI_API_KEY` | ✅ | — | Google Gemini API access (`GOOGLE_API_KEY` also accepted) |
+| `GEMINI_MODEL` | | `gemini-2.5-flash` | Generation model |
 | `AUTH_MODE` | | `developer` | `developer` (no login) or `full` (future) |
 | `SQLITE_PATH` | | `data/askdocs.db` | Database file |
 | `DEVELOPER_NAME` | | `Developer` | Display name for the seeded user |
@@ -80,9 +82,9 @@ which is never committed.
 2. **Ask** — the question is embedded and scored (cosine similarity) against
    all chunks. If nothing clears the relevance threshold, the fixed fallback
    message is returned **without calling the LLM**.
-3. **Answer** — the top chunks and the question go to Claude with a system
-   prompt that forbids outside knowledge and mandates the exact fallback when
-   the context is insufficient. The answer streams to the UI and is cached.
+3. **Answer** — the top chunks and the question go to Gemini with a system
+   instruction that forbids outside knowledge and mandates the exact fallback
+   when the context is insufficient. The answer streams to the UI and is cached.
 
 Full design: [docs/architecture.md](docs/architecture.md) ·
 Specification: [docs/requirements.md](docs/requirements.md) ·
@@ -101,6 +103,6 @@ multi-user login (`AUTH_MODE=full`, Auth.js) later requires no schema change.
 pnpm test
 ```
 
-Tests mock the Anthropic client and the embedding model (no network, no model
+Tests mock the Gemini client and the embedding model (no network, no model
 downloads) and use a throwaway SQLite database per test — the committed
 `data/askdocs.db` is never touched.

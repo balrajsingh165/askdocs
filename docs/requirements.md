@@ -125,13 +125,13 @@ Worked example from the assignment:
 | Styling | Tailwind CSS |
 | Database | SQLite (`better-sqlite3`) + Drizzle ORM, committed `data/askdocs.db` |
 | Embeddings | Transformers.js `Xenova/all-MiniLM-L6-v2`, in-process, no extra API key |
-| Generation | Claude `claude-opus-4-8` via the official `@anthropic-ai/sdk`, streamed |
+| Generation | Google Gemini `gemini-2.5-flash` via the official `@google/genai`, streamed |
 | PDF extraction | `unpdf` |
 | DOCX extraction | `mammoth` |
 | Testing | Vitest |
 | Package manager | pnpm (lockfile committed) |
 
-The only required secret is `ANTHROPIC_API_KEY` (in `.env.local`, never
+The only required secret is `GEMINI_API_KEY` (in `.env.local` or `.env`, never
 committed).
 
 ## 5. Out of Scope (for this assessment)

@@ -11,7 +11,7 @@ right phase.
 
 - [x] Scaffold Next.js (App Router) + TypeScript + Tailwind project
 - [x] Write project documentation (`docs/requirements.md`, `docs/architecture.md`, `docs/todo.md`, `README.md`, `CLAUDE.md`)
-- [ ] Install runtime dependencies (`@anthropic-ai/sdk`, `better-sqlite3`, `drizzle-orm`, `@xenova/transformers`, `unpdf`, `mammoth`, `zod`)
+- [ ] Install runtime dependencies (`@google/genai`, `better-sqlite3`, `drizzle-orm`, `@xenova/transformers`, `unpdf`, `mammoth`, `zod`)
 - [ ] Install dev dependencies (`drizzle-kit`, `vitest`, `@types/better-sqlite3`)
 - [ ] Add scripts to `package.json` (`typecheck`, `test`, `db:generate`, `db:migrate`, `db:seed`)
 - [ ] Create `.env.example` documenting all environment variables
@@ -68,7 +68,7 @@ right phase.
 
 ## Phase 6 — Testing
 
-- [ ] Test infrastructure: temp-file SQLite per test, mocked Anthropic client, mocked embedding model
+- [ ] Test infrastructure: temp-file SQLite per test, mocked Gemini client, mocked embedding model
 - [ ] Extraction tests (PDF fixture, DOCX fixture, corrupt/empty file → `ExtractionError`)
 - [ ] Chunking tests (size, overlap, boundary snapping, short-text edge cases)
 - [ ] Embedding tests (cache hit/miss, normalization)

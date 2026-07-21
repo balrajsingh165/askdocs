@@ -1,36 +1,37 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { CLAUDE_MAX_TOKENS, CLAUDE_MODEL, config } from "@/lib/config";
+import { GoogleGenAI } from "@google/genai";
+import { config } from "@/lib/config";
 import { GenerationError } from "@/lib/errors";
 import { buildUserMessage, SYSTEM_PROMPT } from "@/lib/rag/prompt";
 import type { RetrievedChunk } from "@/lib/rag/retrieval";
 
 /**
- * Claude answer generation. This is the ONLY module that imports the Anthropic
- * SDK. Answers are streamed so the UI renders tokens as they arrive.
+ * Gemini answer generation. This is the ONLY module that imports the Google
+ * Gen AI SDK. Answers are streamed so the UI renders tokens as they arrive.
+ *
+ * Grounding rules are supplied via the system instruction; the retrieved
+ * chunks and question are supplied as the user content. Temperature is 0 for
+ * faithful, deterministic grounding, and model thinking is disabled to keep
+ * short factual answers fast.
  *
  * @module lib/rag/generation
  */
 
-let client: Anthropic | null = null;
+let client: GoogleGenAI | null = null;
 
-function getClient(): Anthropic {
-  if (!config.anthropicApiKey) {
+function getClient(): GoogleGenAI {
+  if (!config.geminiApiKey) {
     throw new GenerationError(
-      "ANTHROPIC_API_KEY is not configured. Set it in .env.local.",
+      "GEMINI_API_KEY is not configured. Set it in .env.local (or .env).",
     );
   }
   if (!client) {
-    client = new Anthropic({ apiKey: config.anthropicApiKey });
+    client = new GoogleGenAI({ apiKey: config.geminiApiKey });
   }
   return client;
 }
 
 /**
  * Stream a grounded answer for a question and its retrieved context.
- *
- * Grounding rules are supplied via the system prompt; the retrieved chunks and
- * question are supplied via the user message. Uses adaptive thinking and no
- * sampling parameters (rejected by this model).
  *
  * @param question - The user's question.
  * @param chunks - Retrieved context chunks.
@@ -41,23 +42,22 @@ export async function* streamAnswer(
   question: string,
   chunks: RetrievedChunk[],
 ): AsyncGenerator<string> {
-  const anthropic = getClient();
+  const ai = getClient();
   try {
-    const stream = anthropic.messages.stream({
-      model: CLAUDE_MODEL,
-      max_tokens: CLAUDE_MAX_TOKENS,
-      thinking: { type: "adaptive" },
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: buildUserMessage(question, chunks) }],
+    const stream = await ai.models.generateContentStream({
+      model: config.geminiModel,
+      contents: buildUserMessage(question, chunks),
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        maxOutputTokens: config.geminiMaxTokens,
+        temperature: 0,
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     });
 
-    for await (const event of stream) {
-      if (
-        event.type === "content_block_delta" &&
-        event.delta.type === "text_delta"
-      ) {
-        yield event.delta.text;
-      }
+    for await (const chunk of stream) {
+      const text = chunk.text;
+      if (text) yield text;
     }
   } catch (error) {
     if (error instanceof GenerationError) throw error;

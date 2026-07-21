@@ -27,7 +27,7 @@ service is unit-testable in isolation.
 │  │ config  │ │ auth   │ │ cache   │ │ ratelimit │ │ rag                    │  │
 │  │         │ │ session│ │ answer/ │ │ sliding   │ │ extraction ▸ chunking  │  │
 │  │         │ │        │ │ embed   │ │ window    │ │ ▸ embedding ▸ retrieval│  │
-│  │         │ │        │ │         │ │           │ │ ▸ generation (Claude)  │  │
+│  │         │ │        │ │         │ │           │ │ ▸ generation (Gemini)  │  │
 │  └─────────┘ └────────┘ └─────────┘ └───────────┘ └────────────────────────┘  │
 │                                   │                                           │
 │                                   ▼                                           │
@@ -35,7 +35,7 @@ service is unit-testable in isolation.
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-External dependencies: the Anthropic API (generation only) and the
+External dependencies: the Google Gemini API (generation only) and the
 Transformers.js MiniLM model (downloaded once, cached locally, runs
 in-process). Embeddings never leave the machine.
 
@@ -73,7 +73,7 @@ lib/
     ├── embedding.ts               Chunks → vectors (MiniLM, cached)
     ├── retrieval.ts               Question → top-K relevant chunks + gate
     ├── prompt.ts                  System + user prompt construction
-    └── generation.ts              Claude SDK wrapper (the only SDK touchpoint)
+    └── generation.ts              Gemini SDK wrapper (the only SDK touchpoint)
 middleware.ts                      Guards /api/* (except /api/health)
 drizzle/                           Generated SQL migrations (committed)
 data/askdocs.db                    Committed, pre-migrated, seeded database
@@ -88,8 +88,9 @@ else imports typed values. Key entries:
 
 | Constant | Default | Purpose |
 |----------|---------|---------|
-| `ANTHROPIC_API_KEY` | — (required) | Claude API access |
-| `CLAUDE_MODEL` | `claude-opus-4-8` | Generation model |
+| `GEMINI_API_KEY` | — (required) | Google Gemini API access (`GOOGLE_API_KEY` also accepted) |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Generation model |
+| `GEMINI_MAX_TOKENS` | `1024` | Max generated answer length |
 | `EMBEDDING_MODEL` | `Xenova/all-MiniLM-L6-v2` | Local embedding model (384-dim) |
 | `NO_CONTEXT_MESSAGE` | fixed string | The out-of-context fallback (single definition) |
 | `PROMPT_VERSION` | `1` | Bumped on prompt changes; part of the answer-cache key |
@@ -151,7 +152,7 @@ document `failed` with a human-readable reason; the UI shows it on the badge.
   → retrieval    cosine similarity against all ready chunks for this user,
                  take TOP_K above SIMILARITY_THRESHOLD
   → gate         zero chunks pass → stream NO_CONTEXT_MESSAGE (LLM never called)
-  → generation   Claude via SDK stream; system prompt carries grounding rules,
+  → generation   Gemini via SDK stream; system prompt carries grounding rules,
                  user message carries retrieved chunks + question
   → stream       tokens forwarded to the client as they arrive
   → on complete  full answer written to the answer cache
@@ -207,13 +208,15 @@ explicit invalidation needed.
 - `PROMPT_VERSION` is exported and folded into the answer-cache key.
 
 ### Generation (`lib/rag/generation.ts`)
-- The **only** module importing `@anthropic-ai/sdk`.
-- `client.messages.stream(...)` with model `claude-opus-4-8`,
-  `thinking: { type: 'adaptive' }`, `max_tokens: 1024`.
-- No `temperature` / `top_p` / `top_k` — rejected (400) on this model;
-  behavior is steered entirely through the prompt.
-- Exposes an async iterator of text deltas to the route layer; the route
-  adapts it to a web `ReadableStream` response.
+- The **only** module importing `@google/genai`.
+- `ai.models.generateContentStream(...)` with model `gemini-2.5-flash`,
+  `maxOutputTokens: 1024`, `temperature: 0` (faithful, deterministic
+  grounding), and `thinkingConfig: { thinkingBudget: 0 }` (thinking disabled
+  for fast, short factual answers).
+- Grounding rules go in `systemInstruction`; retrieved chunks and the question
+  go in `contents`.
+- Exposes `streamAnswer`, an async iterator of text fragments, to the route
+  layer; the route adapts it to a web `ReadableStream` response.
 
 ## 7. Auth
 
@@ -262,13 +265,13 @@ Transformers.js require Node).
 
 ## 10. Security Notes
 
-- `ANTHROPIC_API_KEY` lives only in `.env.local` and is read only in
+- `GEMINI_API_KEY` lives only in `.env.local`/`.env` and is read only in
   `lib/config.ts`; it never reaches the client bundle.
 - Uploads validated by MIME type **and** extension, plus size/count caps.
 - Extracted text is treated as data, never as instructions to execute; the
   system prompt instructs the model to ignore instruction-like content inside
   documents (prompt-injection hardening).
-- Rate limiting bounds spend on the Claude API.
+- Rate limiting bounds spend on the Gemini API.
 
 ## 11. Future Extensions (deliberate seams)
 

@@ -24,7 +24,7 @@ Task tracker: [docs/todo.md](docs/todo.md)
   (`data/askdocs.db`) is committed to git so reviewers see identical state
 - **Transformers.js** (`Xenova/all-MiniLM-L6-v2`) for local embeddings — no
   second API key, runs in-process
-- **Claude** (`claude-opus-4-8`) via `@anthropic-ai/sdk` for generation
+- **Google Gemini** (`gemini-2.5-flash`) via `@google/genai` for generation
 - **pdf extraction** via `unpdf`, **docx extraction** via `mammoth`
 - **Vitest** for tests
 - **pnpm** is the package manager (lockfile committed) — never use npm/yarn
@@ -46,10 +46,11 @@ Task tracker: [docs/todo.md](docs/todo.md)
 
 ## Environment
 
-- Secrets live in `.env.local` (never committed). See `.env.example`.
-- Required: `ANTHROPIC_API_KEY`.
-- Optional (have defaults): `AUTH_MODE`, `SQLITE_PATH`, `DEVELOPER_NAME`,
-  rate-limit and cache settings.
+- Secrets live in `.env.local` or `.env` (never committed). See `.env.example`.
+- Required: `GEMINI_API_KEY` (a Google AI Studio key; `GOOGLE_API_KEY` is also
+  accepted).
+- Optional (have defaults): `GEMINI_MODEL`, `GEMINI_MAX_TOKENS`, `AUTH_MODE`,
+  `SQLITE_PATH`, `DEVELOPER_NAME`, rate-limit and cache settings.
 - All configuration is read once in `lib/config.ts`. Never call
   `process.env` anywhere else.
 
@@ -120,19 +121,20 @@ Rules:
 - The model must never answer from its own general knowledge, even when it
   knows the answer.
 
-## Claude API Usage
+## Gemini API Usage
 
-- Use the official `@anthropic-ai/sdk` — never raw HTTP.
-- Model: `claude-opus-4-8`, defined once in `lib/config.ts`.
-- Do not pass `temperature`, `top_p`, or `top_k` — they are rejected (400) on
-  this model. Steer behavior through the prompt.
-- Use `thinking: { type: 'adaptive' }`.
-- Stream the answer (`client.messages.stream(...)`) so the UI renders tokens
-  as they arrive, like ChatGPT/Claude.
-- Grounding rules go in the `system` prompt; retrieved chunks and the user
-  question go in the user message. Keep `max_tokens` modest (~1024).
-- All SDK access is wrapped in `lib/rag/generation.ts` so nothing else in the
-  codebase touches the SDK directly.
+- Use the official `@google/genai` SDK — never raw HTTP.
+- Model: `gemini-2.5-flash` by default, read from `config.geminiModel`
+  (override with `GEMINI_MODEL`).
+- `temperature: 0` for faithful, deterministic grounding; `thinkingConfig:
+  { thinkingBudget: 0 }` to keep short factual answers fast; `maxOutputTokens`
+  from `config.geminiMaxTokens` (~1024).
+- Stream the answer (`ai.models.generateContentStream(...)`) so the UI renders
+  tokens as they arrive, like ChatGPT/Claude.
+- Grounding rules go in `systemInstruction`; retrieved chunks and the user
+  question go in the `contents`.
+- All SDK access is wrapped in `lib/rag/generation.ts` (which exposes
+  `streamAnswer`) so nothing else in the codebase touches the SDK directly.
 
 ## Auth (developer mode)
 
@@ -169,7 +171,7 @@ Rules:
 ## Testing
 
 - Vitest, tests mirroring the `lib/` and `app/api/` layout under `tests/`.
-- Mock the Anthropic client and the embedding model — tests never hit the
+- Mock the Gemini client and the embedding model — tests never hit the
   network and never download model weights.
 - Use a throwaway in-memory / temp-file SQLite database per test; never touch
   the committed `data/askdocs.db`.

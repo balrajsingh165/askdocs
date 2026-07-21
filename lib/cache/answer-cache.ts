@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { CLAUDE_MODEL, PROMPT_VERSION } from "@/lib/config";
+import { config, PROMPT_VERSION } from "@/lib/config";
 import type { Db } from "@/lib/db/client";
 import { answerCache } from "@/lib/db/schema";
 import { sha256 } from "@/lib/hash";
@@ -47,7 +47,7 @@ export function answerCacheKey(
     userId,
     normalizeQuestion(question),
     corpus,
-    CLAUDE_MODEL,
+    config.geminiModel,
     PROMPT_VERSION,
   );
 }

@@ -21,12 +21,6 @@ export type { DocumentKind };
 export const NO_CONTEXT_MESSAGE =
   "I don't have enough context in the uploaded document(s) to answer that question.";
 
-/** Claude model used for answer generation. */
-export const CLAUDE_MODEL = "claude-opus-4-8";
-
-/** Upper bound on generated answer length, in tokens. */
-export const CLAUDE_MAX_TOKENS = 1024;
-
 /** Local sentence-embedding model (Transformers.js, runs in-process). */
 export const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
 
@@ -67,7 +61,10 @@ const booleanFromEnv = (defaultValue: boolean) =>
     .transform((value) => value === "true");
 
 const envSchema = z.object({
-  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  GOOGLE_API_KEY: z.string().min(1).optional(),
+  GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash"),
+  GEMINI_MAX_TOKENS: z.coerce.number().int().positive().default(1024),
   AUTH_MODE: z.enum(["developer", "full"]).default("developer"),
   DEVELOPER_NAME: z.string().min(1).default("Developer"),
   SQLITE_PATH: z.string().min(1).default("data/askdocs.db"),
@@ -101,7 +98,9 @@ const env = parsed.data;
  * individual constants above) rather than reading `process.env` directly.
  */
 export const config = {
-  anthropicApiKey: env.ANTHROPIC_API_KEY,
+  geminiApiKey: env.GEMINI_API_KEY ?? env.GOOGLE_API_KEY,
+  geminiModel: env.GEMINI_MODEL,
+  geminiMaxTokens: env.GEMINI_MAX_TOKENS,
   authMode: env.AUTH_MODE,
   developerName: env.DEVELOPER_NAME,
   sqlitePath: env.SQLITE_PATH,
